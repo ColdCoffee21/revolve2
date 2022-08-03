@@ -265,6 +265,10 @@ class OpenaiESOptimizer(ABC, Process):
         assert type(must_do) == bool
         return must_do
 
+    @property
+    def _population_size(self) -> int:
+        return self.__population_size
+
 
 DbBase = declarative_base()
 
