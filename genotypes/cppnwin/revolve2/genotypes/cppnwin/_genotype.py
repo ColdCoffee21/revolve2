@@ -11,6 +11,7 @@ from sqlalchemy.future import select
 from .genotype_schema import DbBase, DbGenotype
 
 
+
 @dataclass
 class Genotype:
     """A generic CPPNWIN genotype."""
@@ -44,6 +45,7 @@ class GenotypeSerializer(Serializer[Genotype]):
     async def to_database(
         cls, session: AsyncSession, objects: List[Genotype]
     ) -> List[int]:
+<<<<<<< HEAD
         """
         Serialize the provided objects to a database using the provided session.
 
@@ -51,11 +53,16 @@ class GenotypeSerializer(Serializer[Genotype]):
         :param objects: The objects to serialize.
         :returns: A list of ids to identify each serialized object.
         """
+=======
+       
+>>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
         dbfitnesses = [
             DbGenotype(serialized_multineat_genome=o.genotype.Serialize())
             for o in objects
         ]
+      
         session.add_all(dbfitnesses)
+
         await session.flush()
         ids = [
             dbfitness.id for dbfitness in dbfitnesses if dbfitness.id is not None

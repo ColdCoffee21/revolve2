@@ -51,7 +51,10 @@ class __Module:
 
 def develop_v1(
     genotype: Genotype,
+    max_modules: int,
+    body_substrate_dimensions: str
 ) -> Body:
+<<<<<<< HEAD
     """
     Develop a CPPNWIN genotype into a modular robot body.
 
@@ -62,6 +65,8 @@ def develop_v1(
     :raises RuntimeError: In case a module is encountered that is not supported.
     """
     max_parts = 10
+=======
+>>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
 
     body_net = multineat.NeuralNetwork()
     genotype.genotype.BuildPhenotype(body_net)
@@ -70,16 +75,13 @@ def develop_v1(
     grid: Set[Tuple[int, int, int]] = set()
 
     body = Body()
-
     to_explore.put(__Module((0, 0, 0), (0, -1, 0), (0, 0, 1), 0, body.core))
     grid.add((0, 0, 0))
     part_count = 1
-
     while not to_explore.empty():
         module = to_explore.get()
 
-        children: List[Tuple[int, int]] = []  # child index, rotation
-
+        children: List[Tuple[int, int]] = []  # child index, rotation in increments of 90 degrees
         if isinstance(module.module_reference, Core):
             children.append((Core.FRONT, 0))
             children.append((Core.LEFT, 1))
@@ -95,8 +97,8 @@ def develop_v1(
             raise RuntimeError()
 
         for (index, rotation) in children:
-            if part_count < max_parts:
-                child = ___add_child(body_net, module, index, rotation, grid)
+            if part_count < max_modules:
+                child = ___add_child(body_net, module, index, rotation, grid, body_substrate_dimensions)
                 if child is not None:
                     to_explore.put(child)
                     part_count += 1
@@ -109,6 +111,7 @@ def __evaluate_cppn(
     body_net: multineat.NeuralNetwork,
     position: Tuple[int, int, int],
     chain_length: int,
+    body_substrate_dimensions: str
 ) -> Tuple[Any, int]:
     """
     Get module type and orientation from a multineat CPPN network.
@@ -131,7 +134,11 @@ def __evaluate_cppn(
 
     # get rotation from output probabilities
     rotation_probs = [outputs[3], outputs[4]]
-    rotation = rotation_probs.index(min(rotation_probs))
+
+    if body_substrate_dimensions == '2d':
+        rotation = 0
+    else:
+        rotation = rotation_probs.index(min(rotation_probs))
 
     return (module_type, rotation)
 
@@ -142,6 +149,7 @@ def ___add_child(
     child_index: int,
     rotation: int,
     grid: Set[Tuple[int, int, int]],
+    body_substrate_dimensions: str
 ) -> Optional[__Module]:
     forward = __rotate(module.forward, module.up, rotation)
     position = __add(module.position, forward)
@@ -154,11 +162,11 @@ def ___add_child(
     else:
         grid.add(position)
 
-    child_type, orientation = __evaluate_cppn(body_net, position, chain_length)
+    child_type, orientation = __evaluate_cppn(body_net, position, chain_length, body_substrate_dimensions)
     if child_type is None:
         return None
     up = __rotate(module.up, forward, orientation)
-
+    print(orientation, orientation * (math.pi / 2.0))
     child = child_type(orientation * (math.pi / 2.0))
     module.module_reference.children[child_index] = child
 

@@ -9,7 +9,11 @@ revolve2_path = pathlib.Path(__file__).parent.parent.parent.resolve()
 
 setup(
     name="revolve2-runners-mujoco",
+<<<<<<< HEAD
     version="0.3.1-beta1",
+=======
+    version="0.3.2-beta1",
+>>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
     description="Mujoco runner for Revolve2",
     author="Computational Intelligence Group Vrije Universiteit",
     url="https://github.com/ci-group/revolve2",

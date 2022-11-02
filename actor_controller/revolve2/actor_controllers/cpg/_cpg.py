@@ -8,6 +8,7 @@ from revolve2.actor_controller import ActorController
 from revolve2.serialization import SerializeError, StaticData
 
 
+# the actual final data structure for the brain phenotype
 class CpgActorController(ActorController):
     """
     Cpg network actor controller.

@@ -14,6 +14,8 @@ def random_v1(
     multineat_params: multineat.Parameters,
     output_activation_func: multineat.ActivationFunction,
     num_initial_mutations: int,
+    n_env_conditions: int,
+    plastic_brain: int,
 ) -> Genotype:
     """
     Create a CPPNWIN genotype for a modular robot CPG brain.
@@ -30,17 +32,31 @@ def random_v1(
     # if you want another one, make sure it's output is between -1 and 1.
     assert output_activation_func == multineat.ActivationFunction.SIGNED_SINE
 
-    return base_random_v1(
-        innov_db,
-        rng,
-        multineat_params,
-        output_activation_func,
-        7,  # bias(always 1), x1, y1, z1, x2, y2, z2
-        1,  # weight
-        num_initial_mutations,
-    )
+    if plastic_brain == 0:
+        return base_random_v1(
+            innov_db,
+            rng,
+            multineat_params,
+            output_activation_func,
+            # 7,  # bias(always 1), x1, y1, z1, x2, y2, z2
+            6, # x1, y1, z1, x2, y2, z2
+            1,  # weight
+            num_initial_mutations,
+        )
+    else:
+        return base_random_v1(
+            innov_db,
+            rng,
+            multineat_params,
+            output_activation_func,
+            # 8,  # bias(always 1), x1, y1, z1, x2, y2, z2, inclined
+            7, # x1, y1, z1, x2, y2, z2, inclined
+            1,  # weight
+            num_initial_mutations,
+        )
 
 
+<<<<<<< HEAD
 def develop_v1(genotype: Genotype, body: Body) -> BrainCpgNetworkNeighbourV1:
     """
     Develop a CPPNWIN genotype into a `BrainCpgNetworkNeighbourV1` brain.
@@ -52,3 +68,8 @@ def develop_v1(genotype: Genotype, body: Body) -> BrainCpgNetworkNeighbourV1:
     :returns: The create brain.
     """
     return BrainCpgNetworkNeighbourV1(genotype.genotype)
+=======
+def develop_v1(genotype: Genotype, body: Body, env_condition: int,
+               n_env_conditions: int, plastic_brain: int) -> BrainCpgNetworkNeighbourV1:
+    return BrainCpgNetworkNeighbourV1(genotype.genotype, env_condition, n_env_conditions, plastic_brain)
+>>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
