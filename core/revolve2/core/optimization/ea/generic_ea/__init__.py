@@ -16,9 +16,5 @@ __all__ = [
     "DbEAOptimizerIndividual",
     "DbEAOptimizerParent",
     "DbEAOptimizerState",
-<<<<<<< HEAD
-    "EAOptimizer",
-=======
     "DbEnvconditions"
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
 ]

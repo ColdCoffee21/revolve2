@@ -1,10 +1,4 @@
-<<<<<<< HEAD
-"""SQLAlchemy database model for EA."""
-
-from sqlalchemy import Column, Integer, String
-=======
 from sqlalchemy import Column, Integer, String, Float, Boolean
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
 from sqlalchemy.ext.declarative import declarative_base
 
 DbBase = declarative_base()

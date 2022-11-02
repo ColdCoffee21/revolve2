@@ -133,7 +133,7 @@ class Config():
         parser.add_argument(
             "--simulator",
             required=False,
-            default="isaac",
+            default="mujoco",
             type=str,
             help="isaac or mujoco",
         )

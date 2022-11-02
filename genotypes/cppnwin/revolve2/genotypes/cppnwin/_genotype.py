@@ -45,17 +45,7 @@ class GenotypeSerializer(Serializer[Genotype]):
     async def to_database(
         cls, session: AsyncSession, objects: List[Genotype]
     ) -> List[int]:
-<<<<<<< HEAD
-        """
-        Serialize the provided objects to a database using the provided session.
-
-        :param session: Session used when serializing to the database. This session will not be committed by this function.
-        :param objects: The objects to serialize.
-        :returns: A list of ids to identify each serialized object.
-        """
-=======
        
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
         dbfitnesses = [
             DbGenotype(serialized_multineat_genome=o.genotype.Serialize())
             for o in objects

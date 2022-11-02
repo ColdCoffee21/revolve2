@@ -37,16 +37,6 @@ class FloatSerializer(Serializer[float]):
     async def to_database(
         cls, session: AsyncSession, objects: List[dict]
     ) -> List[int]:
-<<<<<<< HEAD
-        """
-        Serialize the provided objects to a database using the provided session.
-
-        :param session: Session used when serializing to the database. This session will not be committed by this function.
-        :param objects: The objects to serialize.
-        :returns: A list of ids to identify each serialized object.
-        """
-        items = [DbFloat(value=f) for f in objects]
-=======
 
         # TODO: set attributes dynamically
         items = [DbFloat(
@@ -78,7 +68,6 @@ class FloatSerializer(Serializer[float]):
                          )
                  for f in objects]
 
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
         session.add_all(items)
         await session.flush()
 

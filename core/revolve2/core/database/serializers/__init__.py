@@ -9,10 +9,6 @@ __all__ = [
     "DbNdarray1xn",
     "DbNdarray1xnItem",
     "FloatSerializer",
-<<<<<<< HEAD
-    "Ndarray1xnSerializer",
-=======
     "DbFloat",
     "DbStates"
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
 ]

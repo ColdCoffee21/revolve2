@@ -18,16 +18,7 @@ class BrainCpgNetworkNeighbourV1(ModularRobotBrainCpgNetworkNeighbour):
 
     _genotype: multineat.Genome
 
-<<<<<<< HEAD
-    def __init__(self, genotype: multineat.Genome):
-        """
-        Initialize this object.
-
-        :param genotype: A multineat genome used for determining weights.
-        """
-=======
     def __init__(self, genotype: multineat.Genome, env_condition: list, n_env_conditions: int, plastic_brain: int):
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
         self._genotype = genotype
         self._env_condition = env_condition
         self._n_env_conditions = n_env_conditions

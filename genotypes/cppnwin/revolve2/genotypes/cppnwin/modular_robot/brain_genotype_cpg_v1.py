@@ -56,20 +56,6 @@ def random_v1(
         )
 
 
-<<<<<<< HEAD
-def develop_v1(genotype: Genotype, body: Body) -> BrainCpgNetworkNeighbourV1:
-    """
-    Develop a CPPNWIN genotype into a `BrainCpgNetworkNeighbourV1` brain.
-
-    It is important that the genotype was created using a compatible function.
-
-    :param genotype: The genotype to create the brain from.
-    :param body: # TODO This parameter is not used.
-    :returns: The create brain.
-    """
-    return BrainCpgNetworkNeighbourV1(genotype.genotype)
-=======
 def develop_v1(genotype: Genotype, body: Body, env_condition: int,
                n_env_conditions: int, plastic_brain: int) -> BrainCpgNetworkNeighbourV1:
     return BrainCpgNetworkNeighbourV1(genotype.genotype, env_condition, n_env_conditions, plastic_brain)
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449

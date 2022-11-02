@@ -14,15 +14,12 @@ from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 
-<<<<<<< HEAD
-=======
 from revolve2.core.database import IncompatibleError, Serializer
 from revolve2.core.modular_robot import MeasureRelative
 from revolve2.core.optimization import Process, ProcessIdGen
 from ast import literal_eval
 import sys
 
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
 from ._database import (
     DbBase,
     DbEnvconditions,
@@ -39,20 +36,7 @@ Genotype = TypeVar("Genotype")
 Measure = TypeVar("Measure")
 
 
-<<<<<<< HEAD
-class EAOptimizer(Process, Generic[Genotype, Fitness]):
-    """
-    A generic optimizer implementation for evolutionary algorithms.
-
-    Inherit from this class and implement its abstract methods.
-    See the `Process` parent class on how to make an instance of your implementation.
-    You can run the optimization process using the `run` function.
-
-    Results will be saved every generation in the provided database.
-    """
-=======
 class EAOptimizer(Process, Generic[Genotype, Measure]):
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
 
     @abstractmethod
     async def _evaluate_generation(
@@ -66,14 +50,7 @@ class EAOptimizer(Process, Generic[Genotype, Measure]):
         Evaluate a list of genotypes.
 
         :param genotypes: The genotypes to evaluate. Must not be altered.
-<<<<<<< HEAD
-        :param database: Database that can be used to store anything you want to save from the evaluation.
-        :param process_id: Unique identifier in the completely program specifically made for this function call.
-        :param process_id_gen: Can be used to create more unique identifiers.
-        :returns: The fitness result.
-=======
         :return: The Measure result.
->>>>>>> f22d028c6868fe53f42911ccfc8eea8ae3123449
         """
 
     @abstractmethod
