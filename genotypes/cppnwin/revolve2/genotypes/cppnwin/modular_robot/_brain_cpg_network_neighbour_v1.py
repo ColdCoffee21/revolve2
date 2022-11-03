@@ -1,6 +1,7 @@
-from typing import List, Tuple, cast
+from typing import List, Set, Tuple, cast
 
 import multineat
+
 from revolve2.core.modular_robot import ActiveHinge, Body
 from revolve2.core.modular_robot.brains import (
     BrainCpgNetworkNeighbour as ModularRobotBrainCpgNetworkNeighbour,
@@ -8,23 +9,13 @@ from revolve2.core.modular_robot.brains import (
 
 
 class BrainCpgNetworkNeighbourV1(ModularRobotBrainCpgNetworkNeighbour):
-    """
-    A CPG brain based on `ModularRobotBrainCpgNetworkNeighbour` that creates weights from a CPPNWIN network.
-
-    Weights are determined by querying the CPPN network with inputs:
-    (hinge1_posx, hinge1_posy, hinge1_posz, hinge2_posx, hinge2_posy, hinge3_posz)
-    If the weight in internal, hinge1 and hinge2 position will be the same.
-    """
-
     _genotype: multineat.Genome
 
-    def __init__(self, genotype: multineat.Genome):
-        """
-        Initialize this object.
-
-        :param genotype: A multineat genome used for determining weights.
-        """
+    def __init__(self, genotype: multineat.Genome, env_condition: list, n_env_conditions: int, plastic_brain: int):
         self._genotype = genotype
+        self._env_condition = env_condition
+        self._n_env_conditions = n_env_conditions
+        self._plastic_brain = plastic_brain
 
     def _make_weights(
         self,
@@ -35,42 +26,106 @@ class BrainCpgNetworkNeighbourV1(ModularRobotBrainCpgNetworkNeighbour):
         brain_net = multineat.NeuralNetwork()
         self._genotype.BuildPhenotype(brain_net)
 
-        internal_weights = [
-            self._evaluate_network(
-                brain_net,
-                [
-                    1.0,
-                    float(pos.x),
-                    float(pos.y),
-                    float(pos.z),
-                    float(pos.x),
-                    float(pos.y),
-                    float(pos.z),
-                ],
-            )
-            for pos in [
-                body.grid_position(active_hinge) for active_hinge in active_hinges
+        if self._plastic_brain == 0:
+            internal_weights = [
+                self._evaluate_network(
+                    brain_net,
+                    [
+                        #1.0,
+                        float(pos.x),
+                        float(pos.y),
+                        float(pos.z),
+                        float(pos.x),
+                        float(pos.y),
+                        float(pos.z),
+                    ],
+                )
+                for pos in [
+                    body.grid_position(active_hinge) for active_hinge in active_hinges
+                ]
             ]
-        ]
 
-        external_weights = [
-            self._evaluate_network(
-                brain_net,
-                [
-                    1.0,
-                    float(pos1.x),
-                    float(pos1.y),
-                    float(pos1.z),
-                    float(pos2.x),
-                    float(pos2.y),
-                    float(pos2.z),
-                ],
-            )
-            for (pos1, pos2) in [
-                (body.grid_position(active_hinge1), body.grid_position(active_hinge2))
-                for (active_hinge1, active_hinge2) in connections
+            external_weights = [
+                self._evaluate_network(
+                    brain_net,
+                    [
+                        #1.0,
+                        float(pos1.x),
+                        float(pos1.y),
+                        float(pos1.z),
+                        float(pos2.x),
+                        float(pos2.y),
+                        float(pos2.z),
+                    ],
+                )
+                for (pos1, pos2) in [
+                    (body.grid_position(active_hinge1), body.grid_position(active_hinge2))
+                    for (active_hinge1, active_hinge2) in connections
+                ]
             ]
-        ]
+
+        else:
+
+            staticfriction, dynamicfriction, yrotationdegrees, platform, toxic = \
+                float(self._env_condition[0]), \
+                float(self._env_condition[1]), \
+                float(self._env_condition[2]), \
+                float(self._env_condition[3]), \
+                float(self._env_condition[4])
+
+            # TODO: make conditions-checking dynamic
+            # if inclined
+            # if yrotationdegrees > 0:
+            #     inclined = -1
+            # else:
+            #     inclined = 1
+
+            # obsolete name: toxic here means just a change in task
+            if toxic > 0:
+                toxicenv = 1
+            else:
+                toxicenv = -1
+
+            internal_weights = [
+                self._evaluate_network(
+                    brain_net,
+                    [
+                        # 1.0,
+                        float(pos.x),
+                        float(pos.y),
+                        float(pos.z),
+                        float(pos.x),
+                        float(pos.y),
+                        float(pos.z),
+                        #inclined,
+                        toxicenv,
+                    ],
+                )
+                for pos in [
+                    body.grid_position(active_hinge) for active_hinge in active_hinges
+                ]
+            ]
+
+            external_weights = [
+                self._evaluate_network(
+                    brain_net,
+                    [
+                        # 1.0,
+                        float(pos1.x),
+                        float(pos1.y),
+                        float(pos1.z),
+                        float(pos2.x),
+                        float(pos2.y),
+                        float(pos2.z),
+                        #inclined,
+                        toxicenv,
+                    ],
+                )
+                for (pos1, pos2) in [
+                    (body.grid_position(active_hinge1), body.grid_position(active_hinge2))
+                    for (active_hinge1, active_hinge2) in connections
+                ]
+            ]
 
         return (internal_weights, external_weights)
 

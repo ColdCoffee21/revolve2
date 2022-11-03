@@ -139,8 +139,8 @@ class _Finalizer:
         self._finalize_recur(self._body.core)
 
     def _finalize_recur(self, module: Module) -> None:
-        module.id = self._next_id
-        self._next_id += 1
+        #module.id = self._next_id
+        #self._next_id += 1
         for i, child in enumerate(module.children):
             if child is not None:
                 child._parent = module

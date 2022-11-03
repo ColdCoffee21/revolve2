@@ -107,7 +107,7 @@ class LocalRunner(Runner):
                     targets = [
                         target
                         for actor_target in actor_targets
-                        for target in actor_target[1]
+                        for target in actor_target[2]
                     ]
                     self._set_dof_targets(data, targets)
 
