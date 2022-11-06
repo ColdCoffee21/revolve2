@@ -241,9 +241,9 @@ class Optimizer(EAOptimizer[Genotype, float]):
 
         return [
             selection.multiple_unique(
+                number_of_parents,
                 population,
                 fitnesses,
-                number_of_parents,
                 lambda _, fitnesses: selection.tournament(self._rng, fitnesses, k=2),
             )
             for _ in range(num_parent_groups)

@@ -45,18 +45,22 @@ async def main() -> None:
     innov_db_brain = multineat.InnovationDatabase()
 
     process_id = process_id_gen.gen()
+    try:
 
-    maybe_optimizer = await Optimizer.from_database(
-        database=database,
-        process_id=process_id,
-        innov_db_body=innov_db_body,
-        innov_db_brain=innov_db_brain,
-        rng=rng,
-        process_id_gen=process_id_gen,
-        run_simulation=args.run_simulation,
-        num_generations=args.num_generations,
-        simulator=args.simulator
-    )
+        maybe_optimizer = await Optimizer.from_database(
+            database=database,
+            process_id=process_id,
+            innov_db_body=innov_db_body,
+            innov_db_brain=innov_db_brain,
+            rng=rng,
+            process_id_gen=process_id_gen,
+            run_simulation=args.run_simulation,
+            num_generations=args.num_generations,
+            simulator=args.simulator
+        )
+    except:
+        print("error")
+        maybe_optimizer=None
 
     if maybe_optimizer is not None:
         optimizer = maybe_optimizer
