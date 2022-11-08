@@ -156,6 +156,22 @@ class LocalRunner(Runner):
             size=[10, 10, 1],
             rgba=[0.2, 0.2, 0.2, 1],
         )
+
+        """    <geom conaffinity="1" condim="3" hfield="mytilted" material="MatPlane" name="floor" pos="0 0 0" rgba="0.8 0.9 0.8 1" type="hfield" />
+        
+        env_mjcf.worldbody.add(
+            "geom",
+            name="ground",
+            coaffinity ="1",
+            condim="3",
+            hfield="mytilted",
+            material="MatPlane"
+            type="plane",
+            size=[10, 10, 1],
+            rgba=[0.2, 0.2, 0.2, 1],
+        )
+        
+        """
         env_mjcf.worldbody.add(
             "light",
             pos=[0, 0, 100],
@@ -217,6 +233,9 @@ class LocalRunner(Runner):
         xml = env_mjcf.to_xml_string()
         if not isinstance(xml, str):
             raise RuntimeError("Error generating mjcf xml.")
+        print(xml)
+
+
 
         return xml
 
