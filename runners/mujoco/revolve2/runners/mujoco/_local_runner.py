@@ -293,10 +293,12 @@ class LocalRunner(Runner):
 
         env_mjcf.worldbody.add(
             "light",
-            pos=[0, 0, 100],
-            ambient=[0.5, 0.5, 0.5],
+            pos=[-10, -10, 11],
+            ambient=[0.2, 0.2, 0.2],
+            diffuse=[1.5, 1.5, 1.5],
+            dir=[0.5773502691896258, 0.5773502691896258, -0.5773502691896258],
             directional=True,
-            castshadow=False,
+            castshadow=True,
         )
         env_mjcf.visual.headlight.active = 0
 
