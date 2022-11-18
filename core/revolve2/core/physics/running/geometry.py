@@ -1,9 +1,10 @@
 """Interface and implementation of geometries."""
 
 from dataclasses import dataclass
-from typing import List
 
 from pyrr import Quaternion, Vector3
+import numpy.typing as npt
+import numpy as np
 
 
 @dataclass
@@ -35,5 +36,5 @@ class Heightmap(Geometry):
 
     size: Vector3
     base_thickness: float
-    heights: List[List[float]]  # outer list is x, inner list is y
+    heights: npt.NDArray[np.float_]  # MxN matrix. outer list is x, inner list is y
     color: Vector3 = Vector3([0.2, 0.2, 0.2])
