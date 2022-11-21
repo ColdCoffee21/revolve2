@@ -200,6 +200,9 @@ class SerializableFrozenStruct(Serializable):
             await ses.execute(select(cls.table).filter(cls.table.id == id))
         ).scalar_one_or_none()
 
+        if row is None:
+            return None
+
         newinst = cls(
             **{
                 col.name: (await col.type.from_db(ses, getattr(row, col.name)))
