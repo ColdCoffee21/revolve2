@@ -2,9 +2,9 @@
 
 from dataclasses import dataclass
 
-from pyrr import Quaternion, Vector3
-import numpy.typing as npt
 import numpy as np
+import numpy.typing as npt
+from pyrr import Quaternion, Vector3
 
 
 @dataclass
