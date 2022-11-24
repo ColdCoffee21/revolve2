@@ -12,6 +12,7 @@ import revolve2.standard_resources.modular_robots as standard_robots
 from pyrr import Quaternion, Vector3
 from revolve2.actor_controllers.cpg import CpgNetworkStructure
 from revolve2.core.database import (
+    SerializableFrozenSingleton,
     SerializableIncrementableStruct,
     open_async_database_sqlite,
 )
@@ -66,9 +67,21 @@ class ProgramState(
     generation_index: int
 
 
-class DERobotBrainOptimizer:
+@dataclass
+class ProgramRoot(SerializableFrozenSingleton, table_name="program_root"):
+    """
+    Root object containing program data.
+
+    In the database this is a single row in a single table.
+    """
+
+    program_state: ProgramState
+
+
+class Program:
     """Program that optimizes the neural network parameters."""
 
+    RNG_SEED = 0
     NUM_GENERATIONS: int = 100
     POPULATION_SIZE: int = 100
     CROSSOVER_PROBABILITY: float = 0.9
@@ -77,6 +90,8 @@ class DERobotBrainOptimizer:
     SIMULATION_TIME = 30
     SAMPLING_FREQUENCY = 5
     CONTROL_FREQUENCY = 60
+
+    NUM_SIMULATORS = 4
 
     BODY: Body = standard_robots.gecko()
     CPG_NETWORK_STRUCTURE: CpgNetworkStructure = make_cpg_network_structure_neighbour(
@@ -91,86 +106,121 @@ class DERobotBrainOptimizer:
 
     async def run(
         self,
-        rng: Rng,
-        database: AsyncEngine,
     ) -> None:
-        """
-        Run the program.
+        """Run the program."""
+        logging.basicConfig(
+            level=logging.INFO,
+            format="[%(asctime)s] [%(levelname)s] [%(module)s] %(message)s",
+        )
 
-        :param rng: Random number generator for this run.
-        :param database: Database to store (intermediate) results in.
-        """
-        self.db = database
+        logging.info("Program start.")
 
-        self._runner = LocalRunner(headless=True, num_simulators=4)
+        logging.info("Opening database..")
+        self.database = open_async_database_sqlite(
+            db_root_directory="database", create=True
+        )
+        logging.info("Opening database done.")
 
-        async with self.db.begin() as conn:
-            await ProgramState.prepare_db(conn)
+        logging.info("Creating database structure..")
+        async with self.database.begin() as conn:
+            await ProgramRoot.prepare_db(conn)
+        logging.info("Creating database structure done.")
 
-        if not await self.load_state():
-            initial_population = Population(
-                [
-                    Individual(
-                        Genotype(
-                            [
-                                float(v)
-                                for v in rng.rng.random(
-                                    size=self.CPG_NETWORK_STRUCTURE.num_connections
-                                )
-                            ]
-                        ),
-                        Measures(),
-                    )
-                    for _ in range(self.POPULATION_SIZE)
-                ]
+        self._runner = LocalRunner(headless=True, num_simulators=self.NUM_SIMULATORS)
+
+        logging.info("Trying to load program root from database..")
+        if await self.load_root():
+            logging.info("Root loaded successfully.")
+        else:
+            logging.info("Unable to load root. Initializing root..")
+            await self.init_root()
+            logging.info("Initializing state done.")
+
+        logging.info(
+            f"Entering optimization loop. Continuing until around {self.NUM_GENERATIONS} generations."
+        )
+        while self.root.program_state.generation_index < self.NUM_GENERATIONS:
+            logging.info(
+                f"Current generation: {self.root.program_state.generation_index}"
             )
-            await self.measure(initial_population)
-
-            initial_generation_index = 0
-
-            self.state = ProgramState(
-                rng=rng,
-                population=initial_population,
-                generation_index=initial_generation_index,
-            )
-
-            await self.save_state()
-
-        while self.state.generation_index < self.NUM_GENERATIONS:
+            logging.info("Evolving..")
             await self.evolve()
+            logging.info("Evolving done.")
+
+            logging.info("Saving state..")
             await self.save_state()
+            logging.info("Saving state done.")
+        logging.info("Optimization loop done. Exiting program.")
 
     async def save_state(self) -> None:
         """Save the state of the program."""
-        async with AsyncSession(self.db) as ses:
+        async with AsyncSession(self.database) as ses:
             async with ses.begin():
-                await self.state.to_db(ses)
+                await self.root.program_state.to_db(ses)
 
-    async def load_state(self) -> bool:
+    async def init_root(
+        self,
+    ) -> None:
+        """Initialize the program root, saving it the database as well."""
+        initial_rng = Rng(np.random.Generator(np.random.PCG64(self.RNG_SEED)))
+
+        initial_population = Population(
+            [
+                Individual(
+                    Genotype(
+                        [
+                            float(v)
+                            for v in initial_rng.rng.random(
+                                size=self.CPG_NETWORK_STRUCTURE.num_connections
+                            )
+                        ]
+                    ),
+                    Measures(),
+                )
+                for _ in range(self.POPULATION_SIZE)
+            ]
+        )
+        logging.info("Measuring initial population..")
+        await self.measure(initial_population)
+        logging.info("Measuring initial population done.")
+
+        logging.info("Saving root..")
+        state = ProgramState(
+            rng=initial_rng,
+            population=initial_population,
+            generation_index=0,
+        )
+        self.root = ProgramRoot(state)
+        async with AsyncSession(self.database) as ses:
+            async with ses.begin():
+                await self.root.to_db(ses)
+        logging.info("Saving root done.")
+
+    async def load_root(self) -> bool:
         """
         Load the state of the program.
 
         :returns: True if could be loaded from database. False if no data available.
         """
-        async with AsyncSession(self.db) as ses:
+        async with AsyncSession(self.database) as ses:
             async with ses.begin():
-                maybe_state = await ProgramState.from_db_latest(ses, 1)
-                if maybe_state is None:
+                maybe_root = await ProgramRoot.from_db(ses, 1)
+                if maybe_root is None:
                     return False
                 else:
-                    self.state = maybe_state
+                    self.root = maybe_root
                     return True
 
     async def evolve(self) -> None:
         """Iterate one generation further."""
-        self.state.generation_index += 1
+        self.root.program_state.generation_index += 1
 
         offspring = Population(
             [
                 Individual(bounce_parameters(genotype), Measures())
                 for genotype in de_offspring(
-                    self.state.population,
-                    self.state.rng,
+                    self.root.program_state.population,
+                    self.root.program_state.rng,
                     self.DIFFERENTIAL_WEIGHT,
                     self.CROSSOVER_PROBABILITY,
                 )
@@ -180,11 +230,11 @@ class DERobotBrainOptimizer:
         await self.measure(offspring)
 
         original_selection, offspring_selection = replace_if_better(
-            self.state.population, offspring, measure="fitness"
+            self.root.program_state.population, offspring, measure="fitness"
         )
 
-        self.state.population = Population.from_existing_populations(  # type: ignore # TODO
-            [self.state.population, offspring],
+        self.root.program_state.population = Population.from_existing_populations(  # type: ignore # TODO
+            [self.root.program_state.population, offspring],
             [original_selection, offspring_selection],
             [
                 "fitness",
@@ -271,22 +321,8 @@ class DERobotBrainOptimizer:
 
 
 async def main() -> None:
-    """Run the optimization process."""
-    RNG_SEED = 0
-    DATABASE_NAME = "robot_brain_de_db"
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[%(asctime)s] [%(levelname)s] [%(module)s] %(message)s",
-    )
-
-    rng = Rng(np.random.Generator(np.random.PCG64(RNG_SEED)))
-    database = open_async_database_sqlite(DATABASE_NAME, create=True)
-
-    await DERobotBrainOptimizer().run(
-        rng=rng,
-        database=database,
-    )
+    """Run the program."""
+    await Program().run()
 
 
 if __name__ == "__main__":

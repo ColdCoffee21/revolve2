@@ -98,6 +98,8 @@ class SerializableList(List[T], Serializable):
 
         :param conn: Connection to the database.
         """
+        if issubclass(cls.__item_type, Serializable):
+            await cls.__item_type.prepare_db(conn)
         await conn.run_sync(cls.__db_base.metadata.create_all)  # type: ignore # TODO
 
     @classmethod

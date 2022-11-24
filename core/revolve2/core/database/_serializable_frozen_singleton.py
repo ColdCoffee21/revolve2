@@ -13,7 +13,7 @@ from typing import (
     get_type_hints,
 )
 
-from sqlalchemy import Column, Float, Integer, MetaData, String, Table, func
+from sqlalchemy import Column, Float, Integer, MetaData, String, Table
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.automap import automap_base
@@ -21,16 +21,11 @@ from sqlalchemy.future import select
 
 from ._serializable import Serializable
 
-Self = TypeVar("Self", bound="SerializableIncrementableStruct")
+Self = TypeVar("Self", bound="SerializableFrozenSingleton")
 
 
-class SerializableIncrementableStruct(Serializable):
-    """
-    Similar to SerializableStruct, but the database object is identified by an item id and not a row id, which is shared between multiple rows which again can be identied by a version numner.
-
-    Every time an object with the same item_id is saved its version_id is incremented.
-    An extra function is added to retrieve an object using its row id which uniquely identifies a row as with a normal `SerializableStruct`.
-    """
+class SerializableFrozenSingleton(Serializable):
+    """Exactly the same as `SerializableFrozenStruct` except there is ever only one row, so the id is always 1."""
 
     @dataclass
     class __Column:
@@ -48,16 +43,11 @@ class SerializableIncrementableStruct(Serializable):
 
     _columns: List[__Column]
     __db_base: Any  # TODO type
-
-    item_id: Optional[int] = None
-    version: Optional[int] = None
+    __db_id: Optional[int] = None
 
     @classmethod
     def __init_subclass__(
-        cls: Type[Self],
-        /,
-        table_name: str,
-        **kwargs: Dict[str, Any],
+        cls: Type[Self], /, table_name: Optional[str], **kwargs: Dict[str, Any]
     ) -> None:
         """
         Initialize this object.
@@ -65,9 +55,12 @@ class SerializableIncrementableStruct(Serializable):
         :param table_name: Name of table in database. If None this function will be skipped, which is for internal use only.
         :param kwargs: Other arguments not specific to this class.
         """
+        if table_name is None:  # see param description
+            return
+
         super().__init_subclass__(**kwargs)
 
-        base_keys = get_type_hints(SerializableIncrementableStruct).keys()
+        base_keys = get_type_hints(SerializableFrozenSingleton).keys()
         columns = [
             cls.__make_column(name, ctype)
             for name, ctype in get_type_hints(cls).items()
@@ -87,12 +80,6 @@ class SerializableIncrementableStruct(Serializable):
                 unique=True,
                 autoincrement=True,
             ),
-            Column(
-                "item_id",
-                Integer,
-                nullable=False,
-            ),
-            Column("version", Integer, nullable=False),
             *[
                 Column(col.name, cls.__sqlalchemy_type(col.type), nullable=nullable)
                 for (col, nullable) in columns
@@ -168,62 +155,24 @@ class SerializableIncrementableStruct(Serializable):
         :param objects: The objects to serialize.
         :returns: Ids of the objects in the database.
         """
-        args: Dict[str, Union[List[int], List[float], List[str]]] = {}
+        assert len(objects) == 1, "There is only one singleton."
+
+        object = objects[0]
+
+        args: Dict[str, Union[int, float, str]] = {}
 
         for col in cls._columns:
             if issubclass(col.type, Serializable):
-                args[col.name] = await col.type.to_db_multiple(
-                    ses, [getattr(o, col.name) for o in objects]
-                )
+                args[col.name] = await getattr(object, col.name).to_db(ses)
             else:
-                args[col.name] = [getattr(o, col.name) for o in objects]
+                args[col.name] = getattr(object, col.name)
 
-        next_item_id: int = (
-            await ses.execute(select(func.coalesce(func.max(cls.table.item_id), 0) + 1))
-        ).scalar_one()
+        ses.add(cls.table(id=1, **{name: val for name, val in args.items()}))
 
-        for object in objects:
-            if object.item_id is None:
-                object.item_id = next_item_id
-                next_item_id += 1
-
-        versions: List[int] = [
-            (
-                await ses.execute(
-                    select(
-                        func.coalesce(
-                            func.max(cls.table.version).filter(
-                                cls.table.item_id == o.item_id
-                            ),
-                            0,
-                        )
-                        + 1
-                    )
-                )
-            ).scalar_one()
-            for o in objects
-        ]
-
-        for object, version in zip(objects, versions):
-            object.version = version
-
-        rows = [
-            cls.table(
-                item_id=o.item_id,
-                version=version,
-                **{name: val[i] for name, val in args.items()},
-            )
-            for i, o in enumerate(objects)
-        ]
-
-        ses.add_all(rows)
-
-        return [object.item_id for object in objects]  # type: ignore # we just set them so they can't be none
+        return [1]
 
     @classmethod
-    async def from_db_by_id(
-        cls: Type[Self], ses: AsyncSession, id: int
-    ) -> Optional[Self]:
+    async def from_db(cls: Type[Self], ses: AsyncSession, id: int) -> Optional[Self]:
         """
         Deserialize this object from a database.
 
@@ -231,8 +180,10 @@ class SerializableIncrementableStruct(Serializable):
 
         :param ses: Database session.
         :param id: Id of the object in the database.
-        :returns: The deserialized object or None if id does not exist.
+        :returns: The deserialized object or None is id does not exist.
         """
+        assert id == 1, "SerializableFrozenSingleton id is always 1."
+
         row = (
             await ses.execute(select(cls.table).filter(cls.table.id == id))
         ).scalar_one_or_none()
@@ -240,53 +191,14 @@ class SerializableIncrementableStruct(Serializable):
         if row is None:
             return None
 
-        object = cls(
+        newinst = cls(
             **{
                 col.name: (await col.type.from_db(ses, getattr(row, col.name)))
                 if issubclass(col.type, Serializable)
                 else getattr(row, col.name)
                 for col in cls._columns
-            },
+            }
         )
-        object.item_id = int(row.item_id)
-        object.version = int(row.version)
+        newinst.__db_id = id
 
-        return object
-
-    @classmethod
-    async def from_db(
-        cls: Type[Self], ses: AsyncSession, item_id: int
-    ) -> Optional[Self]:
-        """
-        Deserialize the latest version of this object with the the given item id.
-
-        If no object exists, returns None.
-
-        :param ses: Database session.
-        :param item_id: Item id of the object.
-        :returns: The deserialized object or None if no object with the item id exists.
-        """
-        row = (
-            await ses.execute(
-                select(cls.table)
-                .filter(cls.table.item_id == item_id)
-                .order_by(cls.table.version.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-
-        if row is None:
-            return None
-
-        object = cls(
-            **{
-                col.name: (await col.type.from_db(ses, getattr(row, col.name)))
-                if issubclass(col.type, Serializable)
-                else getattr(row, col.name)
-                for col in cls._columns
-            },
-        )
-        object.item_id = int(row.item_id)
-        object.version = int(row.version)
-
-        return object
+        return newinst

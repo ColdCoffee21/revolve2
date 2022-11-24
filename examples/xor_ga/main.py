@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import List, Optional
 
 import numpy as np
 from revolve2.core.database import (
+    SerializableFrozenSingleton,
     SerializableIncrementableStruct,
     open_async_database_sqlite,
 )
@@ -61,88 +63,140 @@ class ProgramState(
     generation_index: int
 
 
-class Optimizer:
+@dataclass
+class ProgramRoot(SerializableFrozenSingleton, table_name="program_root"):
+    """
+    Root object containing program data.
+
+    In the database this is a single row in a single table.
+    """
+
+    program_state: ProgramState
+
+
+class Program:
     """Program that optimizes the neural network parameters."""
 
+    RNG_SEED = 0
     NUM_PARAMS: int = 9
     POPULATION_SIZE: int = 100
     OFFSPRING_SIZE: int = 50
     MUTATE_STD: float = 0.05
+    NUM_GENERATIONS = 100
 
-    db: AsyncEngine
+    database: AsyncEngine
 
-    state: ProgramState
+    root: ProgramRoot
 
     async def run(self) -> None:
         """Run the program."""
-        self.db = open_async_database_sqlite("database")
-        async with self.db.begin() as conn:
-            await ProgramState.prepare_db(conn)
+        logging.basicConfig(
+            level=logging.INFO,
+            format="[%(asctime)s] [%(levelname)s] [%(module)s] %(message)s",
+        )
 
-        if not await self.load_state():
-            rng_seed = 0
-            initial_rng = Rng(np.random.Generator(np.random.PCG64(rng_seed)))
+        logging.info("Program start.")
 
-            initial_population = Population(
-                [
-                    Individual(
-                        Genotype(
-                            [
-                                float(v)
-                                for v in initial_rng.rng.random(size=self.NUM_PARAMS)
-                            ]
-                        ),
-                        Measures(),
-                    )
-                    for _ in range(self.POPULATION_SIZE)
-                ]
+        logging.info("Opening database..")
+        self.database = open_async_database_sqlite(
+            db_root_directory="database", create=True
+        )
+        logging.info("Opening database done.")
+
+        logging.info("Creating database structure..")
+        async with self.database.begin() as conn:
+            await ProgramRoot.prepare_db(conn)
+        logging.info("Creating database structure done.")
+
+        logging.info("Trying to load program root from database..")
+        if await self.load_root():
+            logging.info("Root loaded successfully.")
+        else:
+            logging.info("Unable to load root. Initializing root..")
+            await self.init_root()
+            logging.info("Initializing state done.")
+
+        logging.info(
+            f"Entering optimization loop. Continuing until around {self.NUM_GENERATIONS} generations."
+        )
+        while self.root.program_state.generation_index < self.NUM_GENERATIONS:
+            logging.info(
+                f"Current generation: {self.root.program_state.generation_index}"
             )
-            self.measure(initial_population)
-
-            initial_generation_index = 0
-
-            self.state = ProgramState(
-                rng=initial_rng,
-                population=initial_population,
-                generation_index=initial_generation_index,
-            )
-
-            await self.save_state()
-
-        while self.state.generation_index < 300:
+            logging.info("Evolving..")
             self.evolve()
+            logging.info("Evolving done.")
+
+            logging.info("Saving state..")
             await self.save_state()
+            logging.info("Saving state done.")
+        logging.info("Optimization loop done. Exiting program.")
 
     async def save_state(self) -> None:
         """Save the state of the program."""
-        async with AsyncSession(self.db) as ses:
+        async with AsyncSession(self.database) as ses:
             async with ses.begin():
-                await self.state.to_db(ses)
+                await self.root.program_state.to_db(ses)
 
-    async def load_state(self) -> bool:
+    async def init_root(
+        self,
+    ) -> None:
+        """Initialize the program root, saving it the database as well."""
+        initial_rng = Rng(np.random.Generator(np.random.PCG64(self.RNG_SEED)))
+
+        initial_population = Population(
+            [
+                Individual(
+                    Genotype(
+                        [float(v) for v in initial_rng.rng.random(size=self.NUM_PARAMS)]
+                    ),
+                    Measures(),
+                )
+                for _ in range(self.POPULATION_SIZE)
+            ]
+        )
+        logging.info("Measuring initial population..")
+        self.measure(initial_population)
+        logging.info("Measuring initial population done.")
+
+        logging.info("Saving root..")
+        state = ProgramState(
+            rng=initial_rng,
+            population=initial_population,
+            generation_index=0,
+        )
+        self.root = ProgramRoot(state)
+        async with AsyncSession(self.database) as ses:
+            async with ses.begin():
+                await self.root.to_db(ses)
+        logging.info("Saving root done.")
+
+    async def load_root(self) -> bool:
         """
         Load the state of the program.
 
         :returns: True if could be loaded from database. False if no data available.
         """
-        async with AsyncSession(self.db) as ses:
+        async with AsyncSession(self.database) as ses:
             async with ses.begin():
-                maybe_state = await ProgramState.from_db_latest(ses, 1)
-                if maybe_state is None:
+                maybe_root = await ProgramRoot.from_db(ses, 1)
+                if maybe_root is None:
                     return False
                 else:
-                    self.state = maybe_state
+                    self.root = maybe_root
                     return True
 
     def evolve(self) -> None:
         """Iterate one generation further."""
-        self.state.generation_index += 1
+        self.root.program_state.generation_index += 1
 
         parent_groups = [
             multiple_unique(
-                self.state.population,
+                self.root.program_state.population,
                 2,
-                lambda pop: tournament(pop, "fitness", self.state.rng.rng, k=2),
+                lambda pop: tournament(
+                    pop, "fitness", self.root.program_state.rng.rng, k=2
+                ),
             )
             for _ in range(self.OFFSPRING_SIZE)
         ]
@@ -152,8 +206,8 @@ class Optimizer:
                 Individual(
                     self.mutate(
                         self.crossover(
-                            self.state.population[parents[0]].genotype,
-                            self.state.population[parents[1]].genotype,
+                            self.root.program_state.population[parents[0]].genotype,
+                            self.root.program_state.population[parents[1]].genotype,
                         )
                     ),
                     Measures(),
@@ -164,11 +218,14 @@ class Optimizer:
         self.measure(offspring)
 
         original_selection, offspring_selection = topn(
-            self.state.population, offspring, measure="fitness", n=self.POPULATION_SIZE
+            self.root.program_state.population,
+            offspring,
+            measure="fitness",
+            n=self.POPULATION_SIZE,
         )
 
-        self.state.population = Population.from_existing_populations(  # type: ignore # TODO
-            [self.state.population, offspring],
+        self.root.program_state.population = Population.from_existing_populations(  # type: ignore # TODO
+            [self.root.program_state.population, offspring],
             [original_selection, offspring_selection],
             [  # TODO make them not copied measures
                 "result00",
@@ -194,7 +251,7 @@ class Optimizer:
             [
                 float(v)
                 for v in (
-                    self.state.rng.rng.normal(
+                    self.root.program_state.rng.rng.normal(
                         scale=self.MUTATE_STD, size=self.NUM_PARAMS
                     )
                     + genotype
@@ -212,7 +269,7 @@ class Optimizer:
         """
         return Genotype(
             [
-                b1 if self.state.rng.rng.random() < 0.5 else b2
+                b1 if self.root.program_state.rng.rng.random() < 0.5 else b2
                 for b1, b2 in zip(parent1, parent2)
             ]
         )
@@ -265,7 +322,7 @@ class Optimizer:
 
 async def main() -> None:
     """Run the program."""
-    await Optimizer().run()
+    await Program().run()
 
 
 if __name__ == "__main__":
