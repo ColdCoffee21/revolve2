@@ -196,3 +196,20 @@ class PopList(List[Individual[TGenotype, TMeasures]], Serializable):
                 new_individuals.append(new_ind)
 
         return cls(new_individuals)
+
+    @classmethod
+    def from_existing_equally_sized_populations(
+        cls,
+        populations: List[PopList[TGenotype, TMeasures]],
+        selections: List[int],
+        copied_measures: List[str],
+    ) -> PopList[TGenotype, TMeasures]:  # TODO return type should be Self
+        new_individuals: List[Individual[TGenotype, TMeasures]] = []
+        for i, sel in enumerate(selections):
+            new_ind = Individual(
+                populations[sel][i].genotype, type(populations[sel][i].measures)()
+            )
+            for measure in copied_measures:
+                new_ind.measures[measure] = populations[sel][i].measures[measure]
+            new_individuals.append(new_ind)
+        return new_individuals

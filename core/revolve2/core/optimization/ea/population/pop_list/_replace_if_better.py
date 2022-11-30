@@ -20,7 +20,7 @@ def replace_if_better(
     original_population: PopList[TIndividual, TMeasures],
     offspring_population: PopList[TIndividual, TMeasures],
     measure: str,
-) -> Tuple[List[int], List[int]]:
+) -> List[int]:
     """
     Compare each individual is offspring population with original population index-wise and replaces if better.
 
@@ -29,17 +29,9 @@ def replace_if_better(
     :param original_population: The original population to replace individuals in. Will not be altered.
     :param offspring_population: The offspring population to take individuals from. Will not be unaltered. Individuals will be copied.
     :param measure: The measure to use for selection.
-    :returns: Indices of the selected individuals in their respective populations. Original, offspring.
+    :returns: For each index in the population, the 0 to take the individual from the original population, or 1 to take it from the offspring.
     """
-    original_selection: List[int] = []
-    offspring_selection: List[int] = []
-
-    for index, (orig_ind, off_ind) in enumerate(
-        zip(original_population, offspring_population)
-    ):
-        if off_ind.measures[measure] > orig_ind.measures[measure]:  # type: ignore # deal with this another time
-            offspring_selection.append(index)
-        else:
-            original_selection.append(index)
-
-    return original_selection, offspring_selection
+    return [
+        0 if orig.measures[measure] >= off.measures[measure] else 1
+        for orig, off in zip(original_population, offspring_population)
+    ]
