@@ -27,7 +27,6 @@ class SerializableMeasures(SerializableStruct, table_name=None):
             col.name for col in self._columns
         ], f"measure {key} does not exist"
         val = getattr(self, key)
-        assert val is None or type(val) == int or type(val) == float or type(val) == str
         return val
 
     def __setitem__(self, key: str, value: Union[int, float, str, None]) -> None:
