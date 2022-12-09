@@ -1,5 +1,3 @@
-"""Installation script."""
-
 import os.path
 import pathlib
 
@@ -9,7 +7,7 @@ revolve2_path = pathlib.Path(__file__).parent.parent.parent.resolve()
 
 setup(
     name="revolve2-genotypes-cppnwin",
-    version="0.3.6-beta1",
+    version="0.2.5-alpha3",
     description="CPPNWIN genotype for modular robots from Revolve2",
     author="Computational Intelligence Group Vrije Universiteit",
     url="https://github.com/ci-group/revolve2",
